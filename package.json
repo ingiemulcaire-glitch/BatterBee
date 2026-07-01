@@ -1,1 +1,9 @@
-{}
+{
+  "name": "batter-bee",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "discord.js": "^14.21.0",
+    "dotenv": "^16.4.5"
+  }
+}
