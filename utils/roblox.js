@@ -7,10 +7,22 @@ async function getRobloxId(username) {
       {
         usernames: [username],
         excludeBannedUsers: true
+      },
+      {
+        headers: {
+          "Content-Type": "application/json"
+        }
       }
     );
 
-    return res.data.data?.[0]?.id || null;
+    const data = res.data?.data?.[0];
+
+    if (!data || !data.id) {
+      console.log("❌ Roblox ID not found for:", username);
+      return null;
+    }
+
+    return data.id;
   } catch (err) {
     console.log("ROBLOX ID ERROR:", err.response?.data || err.message);
     return null;
@@ -19,7 +31,10 @@ async function getRobloxId(username) {
 
 async function getRobloxProfile(userId) {
   try {
-    if (!userId) return null;
+    if (!userId || typeof userId !== "number") {
+      console.log("❌ Invalid userId sent to Roblox:", userId);
+      return null;
+    }
 
     const res = await axios.get(
       `https://users.roblox.com/v1/users/${userId}`
