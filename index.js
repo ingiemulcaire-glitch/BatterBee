@@ -8,16 +8,25 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  Events
+  Events,
+  SlashCommandBuilder,
+  REST,
+  Routes
 } = require("discord.js");
 
 const axios = require("axios");
 const fs = require("fs");
 
 // ================= CONFIG =================
+const TOKEN = process.env.TOKEN;
+
+const CLIENT_ID = "1519022460563882217";
+const GUILD_ID = "1512899816626323577";
+
 const VERIFY_CHANNEL = "1513073038789316660";
 const ROLE_ID = "1513897216329121792";
 const LOG_CHANNEL = "1513388178973921341";
+
 const DB_FILE = "./database.json";
 
 // ================= DATABASE =================
@@ -45,7 +54,6 @@ async function sendLog(guild, title, desc) {
       .setColor(0x1c1d23)
       .setTitle(title)
       .setDescription(desc)
-      .setFooter({ text: "Batter Bee Logs 🐝" })
       .setTimestamp();
 
     channel.send({ embeds: [embed] });
@@ -54,19 +62,40 @@ async function sendLog(guild, title, desc) {
   }
 }
 
+// ================= REGISTER SLASH COMMANDS =================
+async function registerCommands() {
+  const commands = [
+    new SlashCommandBuilder()
+      .setName("verifystatus")
+      .setDescription("Check your verification status"),
+
+    new SlashCommandBuilder()
+      .setName("unverify")
+      .setDescription("Remove your verification")
+  ].map(cmd => cmd.toJSON());
+
+  const rest = new REST({ version: "10" }).setToken(TOKEN);
+
+  await rest.put(
+    Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+    { body: commands }
+  );
+}
+
 // ================= READY =================
 client.once("ready", async () => {
   console.log("🐝 Batter Bee online");
+
+  await registerCommands();
 
   const channel = await client.channels.fetch(VERIFY_CHANNEL);
 
   const embed = new EmbedBuilder()
     .setColor(0x7d9d72)
-    .setTitle("🐝 Batter Bee Verification")
+    .setTitle("🐝 Verification")
     .setDescription(`
-𝜗𝒞  verification step ᰍ    ࣪            ݂  
-　  　press the button below to verify  
-　　　　　　^ྀི　Roblox account 𓂃 ∿ 
+𝜗𝒞 verification step ᰍ  
+press verify to link your Roblox account
 `);
 
   const button = new ButtonBuilder()
@@ -74,11 +103,9 @@ client.once("ready", async () => {
     .setLabel("verify")
     .setStyle(ButtonStyle.Success);
 
-  const row = new ActionRowBuilder().addComponents(button);
-
   await channel.send({
     embeds: [embed],
-    components: [row]
+    components: [new ActionRowBuilder().addComponents(button)]
   });
 });
 
@@ -87,7 +114,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     const db = loadDB();
 
-    // ========== VERIFY BUTTON ==========
+    // BUTTON OPEN MODAL
     if (interaction.isButton() && interaction.customId === "verify") {
       const modal = new ModalBuilder()
         .setCustomId("verifyModal")
@@ -95,7 +122,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       const input = new TextInputBuilder()
         .setCustomId("robloxUsername")
-        .setLabel("Enter your Roblox username")
+        .setLabel("Roblox username")
         .setStyle(TextInputStyle.Short);
 
       modal.addComponents(new ActionRowBuilder().addComponents(input));
@@ -103,7 +130,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return interaction.showModal(modal);
     }
 
-    // ========== MODAL ==========
+    // MODAL SUBMIT
     if (interaction.isModalSubmit() && interaction.customId === "verifyModal") {
       const robloxName = interaction.fields.getTextInputValue("robloxUsername");
 
@@ -112,42 +139,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       db[interaction.user.id] = {
         roblox: robloxName,
-        code: code
+        code
       };
 
       saveDB(db);
 
-      const button = new ButtonBuilder()
-        .setCustomId("checkVerify")
-        .setLabel("check verification")
-        .setStyle(ButtonStyle.Primary);
-
-      const embed = new EmbedBuilder()
-        .setColor(0x1c1d23)
-        .setTitle("🐝 Verification Started")
-        .setDescription(`
-Roblox: **${robloxName}**
-
-Add this code to your Roblox profile:
-
-**${code}**
-`);
-
       return interaction.reply({
         ephemeral: true,
-        embeds: [embed],
-        components: [new ActionRowBuilder().addComponents(button)]
+        content: `Add this code to your Roblox profile:\n**${code}**`
       });
     }
 
-    // ========== CHECK VERIFY ==========
+    // CHECK VERIFICATION
     if (interaction.isButton() && interaction.customId === "checkVerify") {
       const data = db[interaction.user.id];
 
       if (!data) {
         return interaction.reply({
           ephemeral: true,
-          content: "no verification found."
+          content: "No verification found."
         });
       }
 
@@ -164,7 +174,7 @@ Add this code to your Roblox profile:
       if (!userId) {
         return interaction.reply({
           ephemeral: true,
-          content: "Roblox user not found."
+          content: "User not found."
         });
       }
 
@@ -177,42 +187,37 @@ Add this code to your Roblox profile:
       if (!desc.includes(data.code)) {
         return interaction.reply({
           ephemeral: true,
-          content: "code not found in Roblox profile."
+          content: "Code not found in profile."
         });
       }
 
       const member = await interaction.guild.members.fetch(interaction.user.id);
 
-      await member.roles.add(ROLE_ID).catch(() => {});
+      await member.roles.add(ROLE_ID).catch(console.error);
 
       const discordName = interaction.user.displayName || interaction.user.username;
-
       const nickname = `𐔌   .  ⋮ ${discordName} .ᐟ ${data.roblox} ֹ   ₊ ꒱`;
 
-      await member.setNickname(nickname).catch(() => {});
+      await member.setNickname(nickname).catch(err => {
+        console.log("Nickname failed:", err);
+      });
 
       db[interaction.user.id].verified = true;
       saveDB(db);
 
-      await sendLog(
-        interaction.guild,
-        "🐝 VERIFIED USER",
-        `**Discord:** ${interaction.user.tag}\n**Roblox:** ${data.roblox}\n**Code:** ${data.code}`
+      await sendLog(interaction.guild,
+        "VERIFIED USER",
+        `${interaction.user.tag} | ${data.roblox}`
       );
 
       return interaction.reply({
         ephemeral: true,
-        embeds: [
-          new EmbedBuilder()
-            .setColor(0x7d9d72)
-            .setTitle("✓ Verified")
-            .setDescription("welcome to the hive 🐝")
-        ]
+        content: "Verified successfully 🐝"
       });
     }
 
-    // ========== UNVERIFY COMMAND ==========
-    if (interaction.isChatInputCommand && interaction.commandName === "unverify") {
+    // SLASH: UNVERIFY
+    if (interaction.isChatInputCommand() && interaction.commandName === "unverify") {
       const member = await interaction.guild.members.fetch(interaction.user.id);
 
       await member.roles.remove(ROLE_ID).catch(() => {});
@@ -221,46 +226,49 @@ Add this code to your Roblox profile:
       delete db[interaction.user.id];
       saveDB(db);
 
-      await sendLog(
-        interaction.guild,
-        "🧼 UNVERIFY",
-        `**User:** ${interaction.user.tag}`
-      );
+      return interaction.reply({
+        ephemeral: true,
+        content: "You are now unverified 🧼"
+      });
+    }
+
+    // SLASH: VERIFY STATUS
+    if (interaction.isChatInputCommand() && interaction.commandName === "verifystatus") {
+      const data = db[interaction.user.id];
+
+      if (!data?.verified) {
+        return interaction.reply({
+          ephemeral: true,
+          content: "You are not verified."
+        });
+      }
 
       return interaction.reply({
         ephemeral: true,
-        content: "you are now unverified 🧼"
+        content: `Verified as **${data.roblox}**`
       });
     }
+
   } catch (err) {
     console.log(err);
 
     if (!interaction.replied) {
-      return interaction.reply({
+      interaction.reply({
         ephemeral: true,
-        content: "something went wrong."
+        content: "error occurred"
       });
     }
   }
 });
 
-// ========== AUTO CLEANUP ==========
+// ================= AUTO CLEANUP =================
 client.on("guildMemberUpdate", async (oldM, newM) => {
-  const ROLE_ID = "1513897216329121792";
+  const had = oldM.roles.cache.has(ROLE_ID);
+  const has = newM.roles.cache.has(ROLE_ID);
 
-  if (oldM.roles.cache.has(ROLE_ID) && !newM.roles.cache.has(ROLE_ID)) {
+  if (had && !has) {
     await newM.setNickname(null).catch(() => {});
-
-    const db = loadDB();
-    delete db[newM.id];
-    saveDB(db);
-
-    await sendLog(
-      newM.guild,
-      "🧼 AUTO CLEANUP",
-      `**User:** ${newM.user.tag}`
-    );
   }
 });
 
-client.login(process.env.TOKEN);
+client.login(TOKEN);
