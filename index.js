@@ -87,6 +87,32 @@ const code = Math.random().toString(36).slice(2, 8);
 // SAVE ONLY IF VALID
 await db.upsertUser(i.user.id, cleanName, robloxId, code);
     }
+    
+    return i.reply({
+
+    ephemeral: true,
+
+    content: `Put this code in your Roblox **About (Bio)** section and save it:\n\n**${code}**`,
+
+    components: [
+
+      new ActionRowBuilder().addComponents(
+
+        new ButtonBuilder()
+
+          .setCustomId("check")
+
+          .setLabel("Check Verification")
+
+          .setStyle(ButtonStyle.Primary)
+
+      )
+
+    ]
+
+  });
+
+}
 
     // ===== CHECK VERIFICATION =====
     if (i.isButton() && i.customId === "check") {
