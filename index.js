@@ -42,54 +42,64 @@ client.once("ready", async () => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isButton()) return;
+  try {
+    // BUTTON CLICK
+    if (interaction.isButton() && interaction.customId === "verify") {
+      const modal = new ModalBuilder()
+        .setCustomId("verifyModal")
+        .setTitle("Roblox Verification");
 
-  // BUTTON CLICK
-  if (interaction.customId === "verify") {
-    const modal = new ModalBuilder()
-      .setCustomId("verifyModal")
-      .setTitle("Roblox Verification");
+      const robloxInput = new TextInputBuilder()
+        .setCustomId("robloxUsername")
+        .setLabel("Enter your Roblox username")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
 
-    const robloxInput = new TextInputBuilder()
-      .setCustomId("robloxUsername")
-      .setLabel("Enter your Roblox username")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
+      const row = new ActionRowBuilder().addComponents(robloxInput);
+      modal.addComponents(row);
 
-    const row = new ActionRowBuilder().addComponents(robloxInput);
-    modal.addComponents(row);
+      return await interaction.showModal(modal);
+    }
 
-    return await interaction.showModal(modal);
-  }
+    // MODAL SUBMIT
+    if (interaction.isModalSubmit() && interaction.customId === "verifyModal") {
+      const robloxName = interaction.fields.getTextInputValue("robloxUsername");
 
-  // MODAL SUBMIT
-  if (interaction.isModalSubmit() && interaction.customId === "verifyModal") {
-    const robloxName = interaction.fields.getTextInputValue("robloxUsername");
+      const codes = ["bee421", "hive882", "buzz119", "comb547", "nectar302"];
+      const code = codes[Math.floor(Math.random() * codes.length)];
 
-    // generate simple code
-    const codes = ["bee421", "hive882", "buzz119", "comb547", "nectar302"];
-    const code = codes[Math.floor(Math.random() * codes.length)];
+      // safe storage (no crash)
+      if (!global.verifications) global.verifications = {};
 
-    // store temporarily (simple version)
-    global.verifications ??= {};
-    global.verifications[interaction.user.id] = {
-      roblox: robloxName,
-      code: code
-    };
+      global.verifications[interaction.user.id] = {
+        roblox: robloxName,
+        code: code
+      };
 
-    await interaction.reply({
-      ephemeral: true,
-      content: `
+      return await interaction.reply({
+        ephemeral: true,
+        content: `
 𐔌   .  ⋮ verification started .ᐟ ֹ   ₊ ꒱
 
-your roblox: **${robloxName}**
+Roblox: **${robloxName}**
 
-add this code to your Roblox profile description:
+Add this code to your Roblox profile description:
 
 **${code}**
 
-then press verify again after saving it.
+Then press verify again after saving it.
 `
+      });
+    }
+
+  } catch (err) {
+    console.log("Interaction error:", err);
+
+    if (interaction.replied || interaction.deferred) return;
+
+    await interaction.reply({
+      ephemeral: true,
+      content: "something went wrong while verifying. try again."
     });
   }
 });
