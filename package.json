@@ -1,9 +1,17 @@
 {
   "name": "batter-bee",
   "version": "1.0.0",
+  "description": "Batter Bee Roblox Verification Bot",
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
-    "discord.js": "^14.21.0",
-    "axios": "^1.6.0"
+    "axios": "^1.11.0",
+    "better-sqlite3": "^11.10.0",
+    "discord.js": "^14.21.0"
   }
 }
