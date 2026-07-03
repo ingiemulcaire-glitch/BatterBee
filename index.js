@@ -17,7 +17,7 @@ client.once("ready", async () => {
   const channel = await client.channels.fetch("1513073038789316660");
 
   const embed = new EmbedBuilder()
-  .setColor(1c1d23) // “invisible / Discord dark embed look”
+ .setColor(0x1c1d23) // “invisible / Discord dark embed look”
   .setDescription(`
 𝜗𝒞  verification step ᰍ    ࣪            ݂  
 　  　press the button below to verify  
