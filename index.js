@@ -62,7 +62,18 @@ client.on(Events.InteractionCreate, async (i) => {
         });
       }
 
-      const code = Math.random().toString(36).substring(2, 8);
+      function generateCode() {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let code = "";
+
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  return code;
+}
+
+const code = generateCode();
 
       await db.upsertUser(i.user.id, roblox, robloxId, code);
 
