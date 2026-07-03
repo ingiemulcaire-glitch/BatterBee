@@ -17,21 +17,17 @@ client.once("ready", async () => {
   const channel = await client.channels.fetch("1513073038789316660");
 
   const embed = new EmbedBuilder()
-    .setColor("#7D9D72")
-    .setDescription(`
-╭────────────୨ৎ
-
-🐝 Batter Bee Verification
-
-Press the button below to verify your Roblox account.
-
-╰────────────୨ৎ
+  .setColor(0x2b2d31) // “invisible / Discord dark embed look”
+  .setDescription(`
+𝜗𝒞  verification step ᰍ    ࣪            ݂  
+　  　press the button below to verify  
+　　　　　　^ྀི　Roblox account 𓂃 ∿ 
 `);
 
-  const button = new ButtonBuilder()
-    .setCustomId("verify")
-    .setLabel("🌿 Tap To Verify")
-    .setStyle(ButtonStyle.Success);
+const button = new ButtonBuilder()
+  .setCustomId("verify")
+  .setLabel("verify")
+  .setStyle(ButtonStyle.Success);
 
   const row = new ActionRowBuilder().addComponents(button);
 
