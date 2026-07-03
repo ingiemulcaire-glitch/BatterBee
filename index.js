@@ -29,7 +29,7 @@ const LOG_CHANNEL = "1513388178973921341";
 
 const DB_FILE = "./database.json";
 
-// ================= DATABASE =================
+// ================= DB =================
 function loadDB() {
   if (!fs.existsSync(DB_FILE)) return {};
   return JSON.parse(fs.readFileSync(DB_FILE));
@@ -44,230 +44,197 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
-// ================= LOG EMBED =================
-async function sendLog(guild, title, desc) {
+// ================= LOGS =================
+async function log(guild, title, desc) {
   try {
-    const channel = await guild.channels.fetch(LOG_CHANNEL);
-    if (!channel) return;
+    const ch = await guild.channels.fetch(LOG_CHANNEL);
+    if (!ch) return;
 
-    const embed = new EmbedBuilder()
-      .setColor(0x1c1d23)
-      .setTitle(title)
-      .setDescription(desc)
-      .setTimestamp();
-
-    channel.send({ embeds: [embed] });
-  } catch (err) {
-    console.log("Log error:", err);
+    ch.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x1c1d23)
+          .setTitle(title)
+          .setDescription(desc)
+          .setTimestamp()
+      ]
+    });
+  } catch (e) {
+    console.log(e);
   }
 }
 
-// ================= REGISTER SLASH COMMANDS =================
+// ================= COMMANDS =================
 async function registerCommands() {
-  const commands = [
-    new SlashCommandBuilder()
-      .setName("verifystatus")
-      .setDescription("Check your verification status"),
-
-    new SlashCommandBuilder()
-      .setName("unverify")
-      .setDescription("Remove your verification")
-  ].map(cmd => cmd.toJSON());
+  const cmds = [
+    new SlashCommandBuilder().setName("unverify").setDescription("Remove verification"),
+    new SlashCommandBuilder().setName("verifystatus").setDescription("Check verification status")
+  ].map(x => x.toJSON());
 
   const rest = new REST({ version: "10" }).setToken(TOKEN);
 
   await rest.put(
     Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
-    { body: commands }
+    { body: cmds }
   );
 }
 
 // ================= READY =================
 client.once("ready", async () => {
-  console.log("🐝 Batter Bee online");
+  console.log("🐝 online");
 
   await registerCommands();
 
-  const channel = await client.channels.fetch(VERIFY_CHANNEL);
+  const ch = await client.channels.fetch(VERIFY_CHANNEL);
 
   const embed = new EmbedBuilder()
     .setColor(0x7d9d72)
     .setTitle("🐝 Verification")
     .setDescription(`
 𝜗𝒞 verification step ᰍ  
-press verify to link your Roblox account
+press verify to link Roblox account
 `);
 
-  const button = new ButtonBuilder()
+  const btn = new ButtonBuilder()
     .setCustomId("verify")
     .setLabel("verify")
     .setStyle(ButtonStyle.Success);
 
-  await channel.send({
+  ch.send({
     embeds: [embed],
-    components: [new ActionRowBuilder().addComponents(button)]
+    components: [new ActionRowBuilder().addComponents(btn)]
   });
 });
 
 // ================= INTERACTIONS =================
-client.on(Events.InteractionCreate, async (interaction) => {
+client.on(Events.InteractionCreate, async (i) => {
   try {
     const db = loadDB();
 
-    // BUTTON OPEN MODAL
-    if (interaction.isButton() && interaction.customId === "verify") {
+    // BUTTON → MODAL
+    if (i.isButton() && i.customId === "verify") {
       const modal = new ModalBuilder()
         .setCustomId("verifyModal")
         .setTitle("Roblox Verification");
 
       const input = new TextInputBuilder()
-        .setCustomId("robloxUsername")
+        .setCustomId("roblox")
         .setLabel("Roblox username")
         .setStyle(TextInputStyle.Short);
 
       modal.addComponents(new ActionRowBuilder().addComponents(input));
 
-      return interaction.showModal(modal);
+      return i.showModal(modal);
     }
 
-    // MODAL SUBMIT
-    if (interaction.isModalSubmit() && interaction.customId === "verifyModal") {
-      const robloxName = interaction.fields.getTextInputValue("robloxUsername");
+    // MODAL → CODE + CHECK BUTTON
+    if (i.isModalSubmit() && i.customId === "verifyModal") {
+      const roblox = i.fields.getTextInputValue("roblox");
 
       const codes = ["bee421", "hive882", "buzz119", "comb547", "nectar302"];
       const code = codes[Math.floor(Math.random() * codes.length)];
 
-      db[interaction.user.id] = {
-        roblox: robloxName,
-        code
-      };
-
+      db[i.user.id] = { roblox, code };
       saveDB(db);
 
-      return interaction.reply({
+      const checkBtn = new ButtonBuilder()
+        .setCustomId("check")
+        .setLabel("check verification")
+        .setStyle(ButtonStyle.Primary);
+
+      return i.reply({
         ephemeral: true,
-        content: `Add this code to your Roblox profile:\n**${code}**`
+        content: `add this code to Roblox profile:\n**${code}**`,
+        components: [new ActionRowBuilder().addComponents(checkBtn)]
       });
     }
 
     // CHECK VERIFICATION
-    if (interaction.isButton() && interaction.customId === "checkVerify") {
-      const data = db[interaction.user.id];
+    if (i.isButton() && i.customId === "check") {
+      const data = db[i.user.id];
 
       if (!data) {
-        return interaction.reply({
-          ephemeral: true,
-          content: "No verification found."
-        });
+        return i.reply({ ephemeral: true, content: "no data found" });
       }
 
-      const userRes = await axios.post(
+      const res = await axios.post(
         "https://users.roblox.com/v1/usernames/users",
-        {
-          usernames: [data.roblox],
-          excludeBannedUsers: true
-        }
+        { usernames: [data.roblox], excludeBannedUsers: true }
       );
 
-      const userId = userRes.data.data[0]?.id;
-
-      if (!userId) {
-        return interaction.reply({
-          ephemeral: true,
-          content: "User not found."
-        });
-      }
+      const id = res.data.data[0]?.id;
 
       const profile = await axios.get(
-        `https://users.roblox.com/v1/users/${userId}`
+        `https://users.roblox.com/v1/users/${id}`
       );
 
       const desc = profile.data.description || "";
 
       if (!desc.includes(data.code)) {
-        return interaction.reply({
-          ephemeral: true,
-          content: "Code not found in profile."
-        });
+        return i.reply({ ephemeral: true, content: "code not found" });
       }
 
-      const member = await interaction.guild.members.fetch(interaction.user.id);
+      const member = await i.guild.members.fetch(i.user.id);
 
-      await member.roles.add(ROLE_ID).catch(console.error);
+      await member.roles.add(ROLE_ID).catch(() => {});
 
-      const discordName = interaction.user.displayName || interaction.user.username;
-      const nickname = `𐔌   .  ⋮ ${discordName} .ᐟ ${data.roblox} ֹ   ₊ ꒱`;
+      const name = i.user.displayName || i.user.username;
 
-      await member.setNickname(nickname).catch(err => {
-        console.log("Nickname failed:", err);
-      });
+      await member.setNickname(
+        `𐔌   .  ⋮ ${name} .ᐟ ${data.roblox} ֹ   ₊ ꒱`
+      ).catch(() => {});
 
-      db[interaction.user.id].verified = true;
+      db[i.user.id].verified = true;
       saveDB(db);
 
-      await sendLog(interaction.guild,
+      await log(i.guild,
         "VERIFIED USER",
-        `${interaction.user.tag} | ${data.roblox}`
+        `${i.user.tag}\nRoblox: ${data.roblox}`
       );
 
-      return interaction.reply({
+      return i.reply({
         ephemeral: true,
-        content: "Verified successfully 🐝"
+        content: "verified 🐝"
       });
     }
 
-    // SLASH: UNVERIFY
-    if (interaction.isChatInputCommand() && interaction.commandName === "unverify") {
-      const member = await interaction.guild.members.fetch(interaction.user.id);
+    // UNVERIFY
+    if (i.isChatInputCommand() && i.commandName === "unverify") {
+      const member = await i.guild.members.fetch(i.user.id);
 
       await member.roles.remove(ROLE_ID).catch(() => {});
       await member.setNickname(null).catch(() => {});
 
-      delete db[interaction.user.id];
+      delete db[i.user.id];
       saveDB(db);
 
-      return interaction.reply({
+      return i.reply({ ephemeral: true, content: "unverified 🧼" });
+    }
+
+    // STATUS
+    if (i.isChatInputCommand() && i.commandName === "verifystatus") {
+      const data = db[i.user.id];
+
+      return i.reply({
         ephemeral: true,
-        content: "You are now unverified 🧼"
+        content: data?.verified
+          ? `verified as ${data.roblox}`
+          : "not verified"
       });
     }
 
-    // SLASH: VERIFY STATUS
-    if (interaction.isChatInputCommand() && interaction.commandName === "verifystatus") {
-      const data = db[interaction.user.id];
-
-      if (!data?.verified) {
-        return interaction.reply({
-          ephemeral: true,
-          content: "You are not verified."
-        });
-      }
-
-      return interaction.reply({
-        ephemeral: true,
-        content: `Verified as **${data.roblox}**`
-      });
-    }
-
-  } catch (err) {
-    console.log(err);
-
-    if (!interaction.replied) {
-      interaction.reply({
-        ephemeral: true,
-        content: "error occurred"
-      });
-    }
+  } catch (e) {
+    console.log(e);
+    if (!i.replied) i.reply({ ephemeral: true, content: "error" });
   }
 });
 
-// ================= AUTO CLEANUP =================
-client.on("guildMemberUpdate", async (oldM, newM) => {
-  const had = oldM.roles.cache.has(ROLE_ID);
-  const has = newM.roles.cache.has(ROLE_ID);
+// ================= CLEANUP =================
+client.on("guildMemberUpdate", async (o, n) => {
+  const ROLE_ID = "1513897216329121792";
 
-  if (had && !has) {
-    await newM.setNickname(null).catch(() => {});
+  if (o.roles.cache.has(ROLE_ID) && !n.roles.cache.has(ROLE_ID)) {
+    await n.setNickname(null).catch(() => {});
   }
 });
 
