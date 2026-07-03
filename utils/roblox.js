@@ -1,8 +1,5 @@
 const axios = require("axios");
 
-/**
- * Get Roblox user ID from username
- */
 async function getRobloxId(username) {
   try {
     const res = await axios.post(
@@ -15,23 +12,22 @@ async function getRobloxId(username) {
 
     return res.data.data?.[0]?.id || null;
   } catch (err) {
-    console.log("Roblox ID fetch error:", err.message);
+    console.log("ROBLOX ID ERROR:", err.response?.data || err.message);
     return null;
   }
 }
 
-/**
- * Get full Roblox profile
- */
 async function getRobloxProfile(userId) {
   try {
+    if (!userId) return null;
+
     const res = await axios.get(
       `https://users.roblox.com/v1/users/${userId}`
     );
 
     return res.data;
   } catch (err) {
-    console.log("Roblox profile error:", err.message);
+    console.log("ROBLOX PROFILE ERROR:", err.response?.data || err.message);
     return null;
   }
 }
