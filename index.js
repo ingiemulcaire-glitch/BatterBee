@@ -44,7 +44,7 @@ client.once("ready", async () => {
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isButton()) return;
 
-  // STEP 2: button click
+  // BUTTON CLICK
   if (interaction.customId === "verify") {
     const modal = new ModalBuilder()
       .setCustomId("verifyModal")
@@ -59,7 +59,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const row = new ActionRowBuilder().addComponents(robloxInput);
     modal.addComponents(row);
 
-    await interaction.showModal(modal);
+    return await interaction.showModal(modal);
+  }
+
+  // MODAL SUBMIT
+  if (interaction.isModalSubmit() && interaction.customId === "verifyModal") {
+    const robloxName = interaction.fields.getTextInputValue("robloxUsername");
+
+    // generate simple code
+    const codes = ["bee421", "hive882", "buzz119", "comb547", "nectar302"];
+    const code = codes[Math.floor(Math.random() * codes.length)];
+
+    // store temporarily (simple version)
+    global.verifications ??= {};
+    global.verifications[interaction.user.id] = {
+      roblox: robloxName,
+      code: code
+    };
+
+    await interaction.reply({
+      ephemeral: true,
+      content: `
+𐔌   .  ⋮ verification started .ᐟ ֹ   ₊ ꒱
+
+your roblox: **${robloxName}**
+
+add this code to your Roblox profile description:
+
+**${code}**
+
+then press verify again after saving it.
+`
+    });
   }
 });
 
