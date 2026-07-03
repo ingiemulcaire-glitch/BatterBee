@@ -45,22 +45,20 @@ const client = new Client({
 });
 
 // ================= LOGS =================
-async function log(guild, title, desc) {
+async function log(guild, title, desc, color = 0x1c1d23) {
   try {
     const ch = await guild.channels.fetch(LOG_CHANNEL);
     if (!ch) return;
 
-    ch.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0x1c1d23)
-          .setTitle(title)
-          .setDescription(desc)
-          .setTimestamp()
-      ]
-    });
+    const embed = new EmbedBuilder()
+      .setColor(color)
+      .setTitle(title)
+      .setDescription(desc)
+      .setTimestamp();
+
+    ch.send({ embeds: [embed] });
   } catch (e) {
-    console.log(e);
+    console.log("log error:", e);
   }
 }
 
@@ -151,52 +149,88 @@ client.on(Events.InteractionCreate, async (i) => {
 
     // CHECK VERIFICATION
     if (i.isButton() && i.customId === "check") {
-      const data = db[i.user.id];
+  const data = db[i.user.id];
 
-      if (!data) {
-        return i.reply({ ephemeral: true, content: "no data found" });
-      }
+  if (!data) {
+    return i.reply({
+      ephemeral: true,
+      content: "no verification data found. restart verification."
+    });
+  }
 
-      const res = await axios.post(
-        "https://users.roblox.com/v1/usernames/users",
-        { usernames: [data.roblox], excludeBannedUsers: true }
-      );
+  // ================= ROBLOX CHECK =================
+  console.log("🔍 Checking Roblox:", data.roblox);
 
-      const id = res.data.data[0]?.id;
-
-      const profile = await axios.get(
-        `https://users.roblox.com/v1/users/${id}`
-      );
-
-      const desc = profile.data.description || "";
-
-      if (!desc.includes(data.code)) {
-        return i.reply({ ephemeral: true, content: "code not found" });
-      }
-
-      const member = await i.guild.members.fetch(i.user.id);
-
-      await member.roles.add(ROLE_ID).catch(() => {});
-
-      const name = i.user.displayName || i.user.username;
-
-      await member.setNickname(
-        `𐔌   .  ⋮ ${name} .ᐟ ${data.roblox} ֹ   ₊ ꒱`
-      ).catch(() => {});
-
-      db[i.user.id].verified = true;
-      saveDB(db);
-
-      await log(i.guild,
-        "VERIFIED USER",
-        `${i.user.tag}\nRoblox: ${data.roblox}`
-      );
-
-      return i.reply({
-        ephemeral: true,
-        content: "verified 🐝"
-      });
+  const res = await axios.post(
+    "https://users.roblox.com/v1/usernames/users",
+    {
+      usernames: [data.roblox],
+      excludeBannedUsers: true
     }
+  );
+
+  const userId = res.data.data[0]?.id;
+
+  if (!userId) {
+    return i.reply({
+      ephemeral: true,
+      content: "Roblox user not found."
+    });
+  }
+
+  const profile = await axios.get(
+    `https://users.roblox.com/v1/users/${userId}`
+  );
+
+  const desc = profile.data.description || "";
+
+  if (!desc.includes(data.code)) {
+    await log(
+      i.guild,
+      "❌ VERIFICATION FAILED",
+      `User: ${i.user.tag}\nMissing code in Roblox profile`
+    );
+
+    return i.reply({
+      ephemeral: true,
+      content: "code not found in Roblox profile."
+    });
+  }
+
+  // ================= SUCCESS =================
+  const member = await i.guild.members.fetch(i.user.id);
+
+  // ROLE ADD (THIS IS THE LINE YOU WERE MISSING)
+  await member.roles.add(ROLE_ID).catch(err => {
+    console.log("❌ Role add failed:", err);
+  });
+
+  // NICKNAME CHANGE
+  const name = i.user.displayName || i.user.username;
+
+  const nickname = `𐔌   .  ⋮ ${name} .ᐟ ${data.roblox} ֹ   ₊ ꒱`;
+
+  await member.setNickname(nickname).catch(err => {
+    console.log("❌ Nickname failed:", err);
+  });
+
+  // SAVE DATABASE
+  db[i.user.id].verified = true;
+  saveDB(db);
+
+  // LOG SUCCESS
+  await log(
+    i.guild,
+    "🐝 VERIFIED USER",
+    `Discord: ${i.user.tag}\nRoblox: ${data.roblox}`
+  );
+
+  // RESPONSE
+  return i.reply({
+    ephemeral: true,
+    content: "verified successfully 🐝"
+  });
+}
 
     // UNVERIFY
     if (i.isChatInputCommand() && i.commandName === "unverify") {
