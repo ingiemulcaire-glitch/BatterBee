@@ -65,31 +65,27 @@ client.on(Events.InteractionCreate, async (i) => {
     if (i.isModalSubmit() && i.customId === "verifyModal") {
       const robloxName = i.fields.getTextInputValue("roblox");
 
-      const robloxId = await getRobloxId(robloxName);
+      const robloxName = i.fields.getTextInputValue("roblox");
 
-      if (!robloxId) {
-        return i.reply({
-          ephemeral: true,
-          embeds: [errorEmbed("Roblox user not found")]
-        });
-      }
+// FORCE CLEAN INPUT
+const cleanName = robloxName.trim();
 
-      const code = Math.random().toString(36).slice(2, 8);
+const robloxId = await getRobloxId(cleanName);
 
-      await db.upsertUser(i.user.id, robloxName, robloxId, code);
+console.log("USERNAME:", cleanName);
+console.log("ROBLOX ID RESULT:", robloxId);
 
-      return i.reply({
-        ephemeral: true,
-        content: `Put this code in your Roblox **About (Bio)** and save it:\n\n**${code}**`,
-        components: [
-          new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId("check")
-              .setLabel("Check Verification")
-              .setStyle(ButtonStyle.Primary)
-          )
-        ]
-      });
+if (!robloxId) {
+  return i.reply({
+    ephemeral: true,
+    content: "❌ Roblox user not found. Check spelling and try again."
+  });
+}
+
+const code = Math.random().toString(36).slice(2, 8);
+
+// SAVE ONLY IF VALID
+await db.upsertUser(i.user.id, cleanName, robloxId, code);
     }
 
     // ===== CHECK VERIFICATION =====
